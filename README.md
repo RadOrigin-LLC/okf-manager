@@ -30,6 +30,22 @@ In Claude Code:
 
 - **Python 3 on your PATH** — nothing else to install: no `pip` packages, no server, no API keys. (The `enrich` command is the exception: it uses Claude's own web-fetch capability; see its note below.)
 
+## Using it from other harnesses (the `okf` CLI)
+
+The slash-commands below are the Claude Code surface, but the engine underneath is a plain command-line tool with no Claude dependency. Any agent — or you, in a shell — can drive it directly:
+
+- By path: `python scripts/okf_check.py <bundle>`, `python scripts/okf_seed.py …`, etc.
+- Via the unified dispatcher: `python scripts <command> …` (e.g. `python scripts check <bundle>`).
+- As a single zero-install file:
+
+  ```bash
+  python build-okf-pyz.py          # writes okf.pyz (stdlib only, no pip)
+  python okf.pyz check <bundle>    # any platform
+  ./okf.pyz check <bundle>         # Unix (via the shebang)
+  ```
+
+Subcommands are the same operations as the slash-commands: `new`, `add`, `convert`, `seed`, `move`, `check`, `map`, `find`, `scan`. To use okfm from a non-Claude harness, point its instructions file (`AGENTS.md`, `GEMINI.md`, …) at the `okf` CLI and the bundle. `enrich` is the one flow that needs the harness's own web-fetch capability, since the engine never goes online.
+
 ## Commands
 
 Every command that writes shows you a preview first and asks before changing anything.
