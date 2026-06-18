@@ -1,14 +1,14 @@
 # okfm — OKF Manager
 
-A Claude Code plugin for building and maintaining an [Open Knowledge Format (OKF)](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) knowledge base — a plain directory of markdown files with YAML frontmatter that a human can read, git can track, and any AI agent can consume without an SDK or server.
+A toolkit — and Claude Code plugin — for building and maintaining an [Open Knowledge Format (OKF)](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) knowledge base: a plain directory of markdown files with YAML frontmatter that a human can read, git can track, and any AI agent can consume without an SDK or server.
 
-okfm gives you a set of commands to create that directory, keep its links and frontmatter consistent, generate concepts from existing sources, and read the whole thing back as a browsable HTML file. The engine is dependency-free stdlib Python 3, and every command previews its changes before writing.
+okfm gives you a set of commands to create that directory, keep its links and frontmatter consistent, generate concepts from existing sources, and read the whole thing back as a browsable HTML file. The engine is dependency-free stdlib Python 3 with no network access, and every command previews its changes before writing. It runs as a Claude Code plugin (`/okfm:*` slash-commands) or as a plain `okf` CLI on any harness or shell.
 
 ## What an OKF bundle is
 
 A bundle is a folder of `.md` files. Each file (a "concept") has a YAML frontmatter block with at least a `type`, and a markdown body. Files link to each other with ordinary markdown links. Two filenames are reserved: `index.md` (a generated table of contents, one per directory) and `log.md` (a change log). That's the whole format — there's no database and no proprietary store. okfm is a manager for that folder, not a new storage system.
 
-This plugin implements the OKF v0.1 spec. It is not affiliated with the upstream OKF project; it targets that spec and links to it above.
+okfm implements the OKF v0.1 spec. It is not affiliated with the upstream OKF project; it targets that spec and links to it above.
 
 ## Who it's for
 
@@ -26,29 +26,73 @@ In Claude Code:
 /plugin install okfm@okf-manager
 ```
 
+For any other harness (or a plain shell), there's nothing to install beyond Python 3 — see [Using it from any harness](#using-it-from-any-harness-the-okf-cli).
+
 ## Requirements
 
-- **Python 3 on your PATH** — nothing else to install: no `pip` packages, no server, no API keys. (The `enrich` command is the exception: it uses Claude's own web-fetch capability; see its note below.)
+- **Python 3 on your PATH** — nothing else to install: no `pip` packages, no server, no API keys. (`enrich` is the exception: it borrows your harness's own web-fetch capability; see [Limitations](#limitations).)
 
-## Using it from other harnesses (the `okf` CLI)
+## Quick start — your first knowledge base
 
-The slash-commands below are the Claude Code surface, but the engine underneath is a plain command-line tool with no Claude dependency. Any agent — or you, in a shell — can drive it directly:
+These steps use the `okf` CLI (see [how to invoke it](#using-it-from-any-harness-the-okf-cli)). In **Claude Code**, you can instead say `/okfm:start` and let the skill handle the flags conversationally — but the CLI form below is the precise, copy-pasteable version.
 
-- By path: `python scripts/okf_check.py <bundle>`, `python scripts/okf_seed.py …`, etc.
-- Via the unified dispatcher: `python scripts <command> …` (e.g. `python scripts check <bundle>`).
-- As a single zero-install file:
+**1. Create the bundle.**
 
-  ```bash
-  python build-okf-pyz.py          # writes okf.pyz (stdlib only, no pip)
-  python okf.pyz check <bundle>    # any platform
-  ./okf.pyz check <bundle>         # Unix (via the shebang)
-  ```
+```bash
+okf new welcome.md --bundle knowledge --init --name "My Knowledge Base" --type Note --title "Welcome"
+```
 
-Subcommands are the same operations as the slash-commands: `new`, `add`, `convert`, `seed`, `move`, `check`, `map`, `find`, `scan`. To use okfm from a non-Claude harness, point its instructions file (`AGENTS.md`, `GEMINI.md`, …) at the `okf` CLI and the bundle. `enrich` is the one flow that needs the harness's own web-fetch capability, since the engine never goes online.
+This makes a `knowledge/` folder containing `index.md`, `log.md`, `okf.json`, and your first concept.
+
+**2. Fill it** — use whatever fits what you already have (add `--dry-run` to preview any of these first):
+
+```bash
+okf scan ./docs                                   # propose importable files from a folder
+okf seed ./api/openapi.json --dest-dir api        # bulk concepts from a DB / OpenAPI spec / dir tree
+okf add notes/architecture.md knowledge/architecture.md --type Doc --title "Architecture"
+okf new knowledge/deploy-gotcha.md --type Note --title "Deploy gotcha" --body "Always run migrations before the deploy, not after."
+```
+
+**3. Keep it healthy.**
+
+```bash
+okf check knowledge                       # validate links, frontmatter, staleness, index drift
+okf check knowledge --fix --dry-run       # preview index/frontmatter repairs; drop --dry-run to apply
+```
+
+**4. Read it back.**
+
+```bash
+okf find knowledge --tag deploy           # ranked keyword/field search
+okf map knowledge                         # writes viz.html — open it in any browser
+```
+
+**5. Wire it in** so agents actually use it — see [Making agents use it](#making-agents-use-it).
+
+## Making agents use it
+
+okfm builds and maintains the folder; it does **not** automatically feed it to an AI. A bundle is a *resource you point agents at*. Two things make it one: commit the folder, and tell your agents to read it. Paste a block like this into the consuming project's `CLAUDE.md` / `AGENTS.md` / `GEMINI.md` (adjust the path):
+
+```markdown
+## Knowledge base (OKF)
+
+This repo has an OKF knowledge base at `knowledge/`, managed by okfm.
+
+- **Before non-trivial work:** read `knowledge/index.md` and follow links
+  relevant to the task. Treat concepts as orientation, then verify against the
+  live code — notes can lag reality.
+- **Trust tiers:** `curated_by: human` concepts are reviewed; `curated_by: agent`
+  are machine-drafted and may be stale — verify before relying on them.
+- **When a durable decision changes:** update the relevant concept and add a
+  `log.md` entry, then run `check`.
+- **Links are standard markdown only** (`[text](/path.md)`), not `[[wikilinks]]`.
+```
+
+Agents read their instructions file at session start, so that's the reliable place to anchor the pointer. The nested `index.md` tree lets an agent start at the root and drill down to the relevant concept instead of loading everything into context.
 
 ## Commands
 
-Every command that writes shows you a preview first and asks before changing anything.
+Every command that writes shows you a preview first and asks before changing anything. Shown as Claude Code slash-commands; the `okf` CLI uses the same names (`okf seed …`, `okf check …`).
 
 ### Get started
 - **`/okfm:start`** — guided onboarding: a short interview, an explanation of the capture filter (what's worth keeping), scaffolds a new bundle, and walks you through your first concepts.
@@ -78,6 +122,22 @@ Every command that writes shows you a preview first and asks before changing any
 
 There is also an always-on `okf` conventions skill (not a command) that keeps the agent's edits inside a bundle source-preserving and link-safe.
 
+## Using it from any harness (the `okf` CLI)
+
+The slash-commands above are the Claude Code surface, but the engine underneath is a plain command-line tool with no Claude dependency. `okf <command>` below means whichever of these your environment supports:
+
+```bash
+okf <command>                              # if the CLI is on your PATH
+python okf.pyz <command>                   # build once: python build-okf-pyz.py
+python /path/to/okf-manager/scripts <command>   # run the engine directory in place
+# Claude Code only:
+python "${CLAUDE_PLUGIN_ROOT}/scripts" <command>
+```
+
+`okf --help` lists commands; `okf <command> --help` shows a command's options. Subcommands: `new`, `add`, `convert`, `seed`, `move`, `check`, `map`, `find`, `scan`.
+
+To use okfm from a non-Claude harness, point its instructions file (`AGENTS.md`, `GEMINI.md`, …) at the `okf` CLI. This repo ships those files already, plus **[USAGE.md](USAGE.md)** — a self-contained operating manual any agent can follow with no skill system at all. `enrich` is the one flow that needs the harness's own web-fetch capability, since the engine never goes online.
+
 ## What `check` validates
 
 `check` reports findings at three levels:
@@ -90,11 +150,46 @@ A broken link is treated as "knowledge not yet written," so it's surfaced, never
 
 ## How it treats your files
 
-- **Dependency-free.** A stdlib Python 3 engine (23 small modules under `scripts/`). No `pip`, no server, no SDK.
+- **Dependency-free.** A stdlib Python 3 engine under `scripts/`. No `pip`, no server, no SDK.
 - **Never destructive.** Every write is previewed first. Hand-authored text, comments, frontmatter key order, and unknown frontmatter keys are preserved; the engine edits only the bytes that change.
 - **The engine owns two things.** The nested `index.md` tree and `log.md` are regenerated/appended by the engine; everything else is yours.
 - **Trust tiers.** Machine-drafted concepts carry `curated_by: agent`. When you review one, you flip it to `curated_by: human`, so AI drafts never silently blend into verified knowledge.
 - **Sync-agnostic.** okfm manages the folder; you sync it however you like (git, a cloud-synced folder, Obsidian, Syncthing). It does no syncing of its own.
+
+## FAQ
+
+**Do I need to be a developer?**
+No. `/okfm:start` is built for non-technical users, and a bundle is just markdown you can read and edit by hand. The structured-source features (`seed` from a database or API spec) are there if you want them, not required.
+
+**Does it work without Claude Code?**
+Yes. The engine is the `okf` CLI with no Claude dependency. Claude Code adds the `/okfm:*` slash-commands and the always-on conventions skill; Codex, Gemini, or a plain shell use the CLI plus [USAGE.md](USAGE.md) / `AGENTS.md`.
+
+**Does it move my existing docs into the knowledge folder, or just point to them?**
+Content lives *in* the bundle — okfm doesn't index files in place. You have two honest options: **import** them (`add`/`convert`/`seed` copy the content in and add frontmatter), or keep your source docs where they are and author lightweight **stub concepts** that cite them. Pick import when the bundle should be the home; pick stubs when you want a thin, searchable layer over docs that stay put (a second layer to keep in sync, and the pointers aren't link-checked).
+
+**Will an agent read my knowledge base automatically?**
+No. There's no background retrieval or vector index. You point the agent at it with a line in `CLAUDE.md`/`AGENTS.md` (see [Making agents use it](#making-agents-use-it)). It's a maintained resource, not automatic RAG.
+
+**Is the search semantic?**
+No — `find` is ranked keyword/field matching (text, type, tag, status). There are no embeddings.
+
+**Does it sync across my devices?**
+No. It manages the folder; you choose how to sync that folder (git, a cloud drive, Syncthing). okfm does no syncing of its own.
+
+**Is my data sent anywhere?**
+No. The engine is stdlib Python with no network calls. `enrich` is the one flow that fetches anything, and it uses your harness's web tool only on URLs you supply — so nothing leaves your machine unless you run `enrich`.
+
+**Can I use it with Obsidian?**
+Yes — a folder of markdown is a valid Obsidian vault. Set Obsidian to use Markdown links (not `[[wikilinks]]`) so `check` can read them.
+
+**What about PDFs or Word docs?**
+The engine doesn't parse binaries. The agent extracts the text first, then writes it with `new`/`convert`.
+
+**How is this different from a wiki, Notion, or a RAG pipeline?**
+There's no server, database, or vendor — it's plain files in your repo, versioned with your code. And there's no vector index: okfm gives you a link-checked, indexed, searchable folder you point agents at, rather than automatic retrieval. The trade-off is that you (or an agent) decide what to capture and when to consult it.
+
+**How do I keep it from rotting?**
+Run `check` — it flags broken links, orphans, stale timestamps, index drift, and AI drafts that lack citations. Trust tiers (`curated_by: agent` → `human`) keep machine drafts from quietly passing as verified.
 
 ## Limitations
 
@@ -106,7 +201,7 @@ Things it deliberately does **not** do, so there are no surprises:
 - **No binary parsing.** PDF/docx aren't read by the engine; the agent extracts text first.
 - **`find` is keyword/field search**, not semantic search — there are no embeddings or vector index.
 - **`--fix` is conservative.** It regenerates indexes and normalizes frontmatter ordering. It does not retarget broken links or delete anything — those stay manual.
-- **Claude Code only.** A Codex port is planned but not in this repo yet.
+- **No automatic retrieval.** Agents use the base only when their instructions point them at it; okfm won't inject it into a model's context on its own.
 
 ## Development
 
@@ -117,7 +212,7 @@ The engine has no third-party dependencies, and the tests use the standard-libra
 for t in tests/test_*.py; do python "$t" || break; done
 ```
 
-At the time of writing this is 138 tests across the `tests/` directory.
+At the time of writing this is 143 tests across the `tests/` directory. See [AGENTS.md](AGENTS.md) for the cross-harness operating and development notes.
 
 ## License
 
