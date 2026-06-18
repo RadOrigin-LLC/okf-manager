@@ -30,7 +30,7 @@ all provenance and limits live in this skill.
 1. Collect the seed URLs, the domain allowlist, and the target bundle. Confirm the allowlist and the 50-page cap with the user before fetching.
 2. Read the bundle's index tree and relevant concepts so you augment rather than duplicate.
 3. For each allowed URL, up to 50:
-   - Fetch it (WebFetch).
+   - Fetch it with your harness's web-fetch capability (Claude Code: `WebFetch`; other harnesses: their own web tool, or a permitted shell fetch such as `curl`). If your harness has **no** web-fetch tool, save the page to a local file and use `convert` instead of fetching.
    - Apply the capture filter; skip if it fails.
    - Decide:
      - **augment** an existing concept — Edit its body to add the new material, add the source under its `# Citations` section, and add a `log.md` note; or

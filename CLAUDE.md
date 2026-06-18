@@ -1,18 +1,10 @@
-# okfm — OKF Manager
+# CLAUDE.md — okfm (OKF Manager)
 
-## What this is
-A single Claude Code plugin (`okfm`) that builds and maintains an Open Knowledge Format (OKF) knowledge base. The repo is both the plugin (root `.claude-plugin/plugin.json`) and a marketplace of one (`.claude-plugin/marketplace.json`, `source: "."`). Commands are `/okfm:<skill>`.
+Operating and development instructions for this repo are in **`AGENTS.md`** (canonical, cross-harness). Read it first.
 
-## Tech stack
-- Dependency-free stdlib **Python 3** engine in `scripts/` — no pip, no SDK, and **no network**. `enrich`'s web access lives in the skill layer (Claude's WebFetch), never in the engine.
-- Skills (markdown) in `skills/<name>/SKILL.md`.
-- Tests in `tests/` using stdlib `unittest` (no pytest). Run all:
-  `for t in tests/test_*.py; do python "$t" || break; done`
+## Claude Code specifics
 
-## Conventions
-- Every write previews first and is never destructive. The engine owns the nested `index.md` tree and `log.md`.
-- Match existing module idioms; keep the engine offline and dependency-free.
-- License: Apache-2.0.
+- This repo is also a Claude Code plugin (`.claude-plugin/plugin.json`) and a marketplace of one (`.claude-plugin/marketplace.json`, `source: "."`). User-facing commands are `/okfm:<skill>`.
+- In Claude Code, the `okf` CLI is invoked as `python "${CLAUDE_PLUGIN_ROOT}/scripts" <command>` (the form used in the command skills). `enrich` uses Claude's `WebFetch`.
 
-## Origin
-Extracted from `rad-claude-skills` (formerly the `rad-okf` plugin) on 2026-06-18; renamed `rad-okf` → `okfm`.
+Everything else — the engine, tests, conventions, and the full command reference — is in `AGENTS.md` and `USAGE.md`.
